@@ -1,42 +1,26 @@
-"""Small standard-library client for Kling V3 image-to-video generation."""
+"""Transport client shared by Kling API wrappers."""
 
 from __future__ import annotations
 
 import base64
-import dataclasses
 import hashlib
 import hmac
 import json
 import os
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
 
-from .errors import KlingAPIError, KlingError, KlingTaskFailed, KlingTimeout
+from .errors import KlingAPIError, KlingError
 
 
 DEFAULT_BASE_URL = "https://api-beijing.klingai.com"
 
 
-@dataclasses.dataclass
-class VideoResult:
-    """Result returned by :meth:`KlingV3ImageToVideo.generate`."""
-
-    task_id: str
-    status: str
-    url: str
-    path: str | None
-    duration: str | None
-    raw: dict[str, Any]
-
-
-class KlingV3ImageToVideo:
-    """Kling V3 image-to-video wrapper with a local-model-style API."""
-
-    model_name = "kling-v3"
+class KlingClient:
+    """Authenticated JSON client for Kling APIs."""
 
     def __init__(
         self,
@@ -57,8 +41,8 @@ class KlingV3ImageToVideo:
         self.request_timeout = request_timeout
 
     @classmethod
-    def from_env(cls) -> "KlingV3ImageToVideo":
-        """Build a model wrapper from KLING_ACCESS_KEY and KLING_SECRET_KEY."""
+    def from_env(cls) -> "KlingClient":
+        """Build a transport client from KLING_ACCESS_KEY and KLING_SECRET_KEY."""
 
         access_key = os.environ.get("KLING_ACCESS_KEY", "")
         secret_key = os.environ.get("KLING_SECRET_KEY", "")
@@ -77,92 +61,13 @@ class KlingV3ImageToVideo:
 
         return cls(access_key, secret_key, base_url=base_url)
 
-    def generate(
-        self,
-        image: str | os.PathLike[str],
-        prompt: str = "",
-        output_path: str | os.PathLike[str] | None = None,
-        duration: int | str = 5,
-        mode: str = "std",
-        poll_interval: float = 5,
-        timeout: float = 600,
-    ) -> VideoResult:
-        """Generate a video from an image and wait for the finished result."""
+    def get(self, path: str) -> dict[str, Any]:
+        return self.request("GET", path)
 
-        create_response = self._create_task(
-            image=image,
-            prompt=prompt,
-            duration=duration,
-            mode=mode,
-        )
-        task_data = self._response_data(create_response)
-        task_id = task_data.get("task_id")
-        if not task_id:
-            raise KlingAPIError("Kling create task response did not include task_id", response=create_response)
+    def post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self.request("POST", path, json_body=payload)
 
-        final_data = self._wait_for_task(
-            task_id=task_id,
-            poll_interval=poll_interval,
-            timeout=timeout,
-        )
-        video = self._first_video(final_data)
-        url = video.get("url", "")
-        if not url:
-            raise KlingAPIError("Kling task succeeded but did not include a video URL", response=final_data)
-
-        saved_path = None
-        if output_path is not None:
-            saved_path = self._download(url, output_path)
-
-        return VideoResult(
-            task_id=task_id,
-            status=final_data.get("task_status", ""),
-            url=url,
-            path=saved_path,
-            duration=video.get("duration"),
-            raw=final_data,
-        )
-
-    def _create_task(
-        self,
-        *,
-        image: str | os.PathLike[str],
-        prompt: str,
-        duration: int | str,
-        mode: str,
-    ) -> dict[str, Any]:
-        payload = {
-            "model_name": self.model_name,
-            "image": self._normalize_image(image),
-            "prompt": prompt or "",
-            "duration": str(duration),
-            "mode": mode,
-        }
-        return self._request("POST", "/v1/videos/image2video", json_body=payload)
-
-    def _get_task(self, task_id: str) -> dict[str, Any]:
-        quoted_id = urllib.parse.quote(task_id, safe="")
-        return self._request("GET", f"/v1/videos/image2video/{quoted_id}")
-
-    def _wait_for_task(self, *, task_id: str, poll_interval: float, timeout: float) -> dict[str, Any]:
-        deadline = time.monotonic() + timeout
-
-        while True:
-            response = self._get_task(task_id)
-            data = self._response_data(response)
-            status = data.get("task_status")
-
-            if status == "succeed":
-                return data
-            if status == "failed":
-                message = data.get("task_status_msg") or "Kling task failed"
-                raise KlingTaskFailed(task_id, message, response=data)
-            if time.monotonic() >= deadline:
-                raise KlingTimeout(task_id, timeout)
-
-            time.sleep(poll_interval)
-
-    def _request(
+    def request(
         self,
         method: str,
         path: str,
@@ -172,7 +77,7 @@ class KlingV3ImageToVideo:
         url = self.base_url + path
         body = None
         headers = {
-            "Authorization": f"Bearer {self._encode_jwt_token()}",
+            "Authorization": f"Bearer {self.encode_jwt_token()}",
             "Content-Type": "application/json",
         }
 
@@ -210,7 +115,21 @@ class KlingV3ImageToVideo:
             )
         return payload
 
-    def _encode_jwt_token(self) -> str:
+    def download(self, url: str, output_path: str | os.PathLike[str]) -> str:
+        destination = Path(output_path).expanduser()
+        if destination.parent != Path("."):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+
+        request = urllib.request.Request(url, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=self.request_timeout) as response:
+                destination.write_bytes(response.read())
+        except urllib.error.URLError as exc:
+            raise KlingAPIError(f"Failed to download Kling video: {exc.reason}") from exc
+
+        return str(destination)
+
+    def encode_jwt_token(self) -> str:
         now = int(time.time())
         header = {"alg": "HS256", "typ": "JWT"}
         payload = {
@@ -227,41 +146,6 @@ class KlingV3ImageToVideo:
         return f"{header_part}.{payload_part}.{signature_part}"
 
     @staticmethod
-    def _normalize_image(image: str | os.PathLike[str]) -> str:
-        value = os.fspath(image)
-        stripped = value.strip()
-
-        if stripped.startswith(("http://", "https://")):
-            return stripped
-        if stripped.startswith("data:") and "base64," in stripped:
-            return stripped.split("base64,", 1)[1].strip()
-
-        path = Path(value).expanduser()
-        if path.is_file():
-            return base64.b64encode(path.read_bytes()).decode("ascii")
-
-        return stripped
-
-    @staticmethod
-    def _response_data(response: dict[str, Any]) -> dict[str, Any]:
-        data = response.get("data")
-        if not isinstance(data, dict):
-            raise KlingAPIError("Kling response did not include an object data field", response=response)
-        return data
-
-    @staticmethod
-    def _first_video(task_data: dict[str, Any]) -> dict[str, Any]:
-        task_result = task_data.get("task_result")
-        if not isinstance(task_result, dict):
-            raise KlingAPIError("Kling task result was missing", response=task_data)
-
-        videos = task_result.get("videos")
-        if not isinstance(videos, list) or not videos or not isinstance(videos[0], dict):
-            raise KlingAPIError("Kling task result did not include videos", response=task_data)
-
-        return videos[0]
-
-    @staticmethod
     def _decode_json(raw: bytes, *, status: int) -> dict[str, Any]:
         try:
             payload = json.loads(raw.decode("utf-8"))
@@ -272,24 +156,10 @@ class KlingV3ImageToVideo:
             raise KlingAPIError("Kling API returned a non-object JSON payload", status=status, response=payload)
         return payload
 
-    def _download(self, url: str, output_path: str | os.PathLike[str]) -> str:
-        destination = Path(output_path).expanduser()
-        if destination.parent != Path("."):
-            destination.parent.mkdir(parents=True, exist_ok=True)
-
-        request = urllib.request.Request(url, method="GET")
-        try:
-            with urllib.request.urlopen(request, timeout=self.request_timeout) as response:
-                destination.write_bytes(response.read())
-        except urllib.error.URLError as exc:
-            raise KlingAPIError(f"Failed to download Kling video: {exc.reason}") from exc
-
-        return str(destination)
-
     @staticmethod
     def _base64url_json(value: dict[str, Any]) -> str:
         raw = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        return KlingV3ImageToVideo._base64url_bytes(raw)
+        return KlingClient._base64url_bytes(raw)
 
     @staticmethod
     def _base64url_bytes(value: bytes) -> str:

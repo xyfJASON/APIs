@@ -1,4 +1,4 @@
-"""Exceptions raised by the GPT-Image-2 wrapper."""
+"""Exceptions raised by the GPT API wrappers."""
 
 
 class GPTImage2Error(Exception):
