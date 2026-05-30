@@ -1,4 +1,4 @@
-"""Shared image task wrappers for GPT Image APIs."""
+"""Image task wrappers for GPT Image APIs."""
 
 from __future__ import annotations
 
@@ -10,12 +10,13 @@ import os
 from pathlib import Path
 from typing import Any, Self
 
-from .client import GPTClient
-from .errors import GPTImage2Error
+from openai import OpenAI
+
+from .errors import GPTError
 
 
 @dataclasses.dataclass
-class ImageResult:
+class GPTImageResult:
     """Generated image result returned by GPT image wrappers."""
 
     b64_json: str
@@ -26,46 +27,49 @@ class ImageResult:
 
 
 class BaseGPTImageTask:
-    """Shared response handling for GPT image generation tasks."""
-
-    model_name = "gpt-image-2"
+    """Base class for GPT image generation tasks."""
 
     def __init__(
         self,
         api_key: str | None = None,
         *,
-        client: GPTClient | None = None,
+        client: Any | None = None,
         base_url: str | None = None,
         request_timeout: float | None = None,
     ) -> None:
-        if not getattr(self, "model_name", ""):
-            raise ValueError("GPT image model name is required")
-
         if client is not None:
             self.client = client
             return
 
-        self.client = GPTClient(
-            api_key=api_key,
-            base_url=base_url,
-            request_timeout=request_timeout,
-        )
+        if not api_key:
+            raise GPTError("OpenAI API key is required")
+
+        kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url is not None:
+            kwargs["base_url"] = base_url
+        if request_timeout is not None:
+            kwargs["timeout"] = request_timeout
+        self.client = OpenAI(**kwargs)
 
     @classmethod
     def from_env(cls) -> Self:
-        return cls(client=GPTClient.from_env())
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        if not api_key:
+            raise GPTError("Missing required environment variable: OPENAI_API_KEY")
+        return cls(api_key=api_key, base_url=base_url)
 
-    def image_result(self, response: object, output_path: str | os.PathLike[str] | None = None) -> ImageResult:
+    def image_result(self, response: object, output_path: str | os.PathLike[str] | None = None) -> GPTImageResult:
         image = self.first_image(response)
         b64_json = self.field(image, "b64_json")
         if not b64_json:
-            raise GPTImage2Error("OpenAI image response did not include b64_json")
+            raise GPTError("OpenAI image response did not include b64_json")
 
         saved_path = None
         if output_path is not None:
             saved_path = self.save_base64_image(b64_json, output_path)
 
-        return ImageResult(
+        return GPTImageResult(
             b64_json=b64_json,
             path=saved_path,
             created=self.field(response, "created"),
@@ -86,7 +90,7 @@ class BaseGPTImageTask:
         if suffix == ".webp":
             return "webp"
 
-        raise GPTImage2Error(
+        raise GPTError(
             "Unsupported output_path extension. Use .png, .jpg, .jpeg, or .webp."
         )
 
@@ -96,14 +100,14 @@ class BaseGPTImageTask:
         try:
             image_bytes = base64.b64decode(b64_json, validate=True)
         except (binascii.Error, ValueError) as exc:
-            raise GPTImage2Error("OpenAI image response included invalid base64 data") from exc
+            raise GPTError("OpenAI image response included invalid base64 data") from exc
 
         try:
             if destination.parent != Path("."):
                 destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(image_bytes)
         except OSError as exc:
-            raise GPTImage2Error(f"Failed to save image to {destination}") from exc
+            raise GPTError(f"Failed to save image to {destination}") from exc
 
         return str(destination)
 
@@ -111,7 +115,7 @@ class BaseGPTImageTask:
     def first_image(cls, response: object) -> object:
         data = cls.field(response, "data")
         if not isinstance(data, list) or not data:
-            raise GPTImage2Error("OpenAI image response did not include data")
+            raise GPTError("OpenAI image response did not include data")
         return data[0]
 
     @staticmethod
@@ -123,7 +127,7 @@ class BaseGPTImageTask:
     @staticmethod
     def require_prompt(prompt: str) -> None:
         if not prompt:
-            raise GPTImage2Error("Prompt is required")
+            raise GPTError("Prompt is required")
 
     @staticmethod
     def open_file_input(value: object, stack: contextlib.ExitStack) -> object:
@@ -145,6 +149,8 @@ class BaseGPTImageTask:
 class GPTImage2TextToImage(BaseGPTImageTask):
     """GPT-Image-2 text-to-image wrapper with a local-model-style API."""
 
+    model_name = "gpt-image-2"
+
     def generate(
         self,
         prompt: str,
@@ -152,11 +158,11 @@ class GPTImage2TextToImage(BaseGPTImageTask):
         *,
         size: str = "auto",
         quality: str = "auto",
-    ) -> ImageResult:
+    ) -> GPTImageResult:
         """Generate one image from a text prompt."""
 
         self.require_prompt(prompt)
-        response = self.client.sdk.images.generate(
+        response = self.client.images.generate(
             model=self.model_name,
             prompt=prompt,
             size=size,
@@ -169,6 +175,8 @@ class GPTImage2TextToImage(BaseGPTImageTask):
 class GPTImage2ImageEditing(BaseGPTImageTask):
     """GPT-Image-2 image editing wrapper with a local-model-style API."""
 
+    model_name = "gpt-image-2"
+
     def generate(
         self,
         image: object,
@@ -179,7 +187,7 @@ class GPTImage2ImageEditing(BaseGPTImageTask):
         size: str = "auto",
         quality: str = "auto",
         input_fidelity: str | None = None,
-    ) -> ImageResult:
+    ) -> GPTImageResult:
         """Generate an edited image from an input image and text prompt."""
 
         self.require_prompt(prompt)
@@ -197,6 +205,6 @@ class GPTImage2ImageEditing(BaseGPTImageTask):
             if input_fidelity is not None:
                 payload["input_fidelity"] = input_fidelity
 
-            response = self.client.sdk.images.edit(**payload)
+            response = self.client.images.edit(**payload)
 
         return self.image_result(response, output_path=output_path)

@@ -24,7 +24,7 @@ class KlingAPIError(KlingError):
         self.response = response
 
 
-class KlingTaskFailed(KlingError):
+class KlingTaskFailedError(KlingError):
     """Raised when a Kling generation task finishes with failed status."""
 
     def __init__(self, task_id: str, message: str = "", *, response: object | None = None) -> None:
@@ -34,7 +34,7 @@ class KlingTaskFailed(KlingError):
         self.response = response
 
 
-class KlingTimeout(KlingError):
+class KlingTimeoutError(KlingError):
     """Raised when polling a Kling task exceeds the configured timeout."""
 
     def __init__(self, task_id: str, timeout: float) -> None:

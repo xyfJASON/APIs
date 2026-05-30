@@ -1,20 +1,21 @@
-"""Shared video task wrappers for Kling APIs."""
+"""Video task wrappers for Kling APIs."""
 
 from __future__ import annotations
 
 import dataclasses
+import base64
 import os
 import time
 import urllib.parse
+from pathlib import Path
 from typing import Any, Self
 
 from .client import KlingClient
-from .errors import KlingAPIError, KlingTaskFailed, KlingTimeout
-from .media import normalize_image
+from .errors import KlingAPIError, KlingTaskFailedError, KlingTimeoutError
 
 
 @dataclasses.dataclass
-class VideoResult:
+class KlingVideoResult:
     """Generated video result returned by Kling video wrappers."""
 
     task_id: str
@@ -25,8 +26,26 @@ class VideoResult:
     raw: dict[str, Any]
 
 
+def normalize_image(image: str | os.PathLike[str]) -> str:
+    """Return a Kling-compatible image string from a URL, path, base64, or data URI."""
+
+    value = os.fspath(image)
+    stripped = value.strip()
+
+    if stripped.startswith(("http://", "https://")):
+        return stripped
+    if stripped.startswith("data:") and "base64," in stripped:
+        return stripped.split("base64,", 1)[1].strip()
+
+    path = Path(value).expanduser()
+    if path.is_file():
+        return base64.b64encode(path.read_bytes()).decode("ascii")
+
+    return stripped
+
+
 class BaseKlingVideoTask:
-    """Shared lifecycle for Kling async video generation tasks."""
+    """Base class for Kling video generation tasks."""
 
     endpoint: str
 
@@ -74,9 +93,9 @@ class BaseKlingVideoTask:
                 return data
             if status == "failed":
                 message = data.get("task_status_msg") or "Kling task failed"
-                raise KlingTaskFailed(task_id, message, response=data)
+                raise KlingTaskFailedError(task_id, message, response=data)
             if time.monotonic() >= deadline:
-                raise KlingTimeout(task_id, timeout)
+                raise KlingTimeoutError(task_id, timeout)
 
             time.sleep(poll_interval)
 
@@ -87,7 +106,7 @@ class BaseKlingVideoTask:
         output_path: str | os.PathLike[str] | None = None,
         poll_interval: float = 5,
         timeout: float = 600,
-    ) -> VideoResult:
+    ) -> KlingVideoResult:
         create_response = self.create_task(payload)
         task_data = self.response_data(create_response)
         task_id = task_data.get("task_id")
@@ -104,7 +123,7 @@ class BaseKlingVideoTask:
         if output_path is not None:
             saved_path = self.client.download(url, output_path)
 
-        return VideoResult(
+        return KlingVideoResult(
             task_id=task_id,
             status=final_data.get("task_status", ""),
             url=url,
@@ -133,39 +152,6 @@ class BaseKlingVideoTask:
         return videos[0]
 
 
-class KlingV3ImageToVideo(BaseKlingVideoTask):
-    """Kling V3 image-to-video wrapper with a local-model-style API."""
-
-    endpoint = "/v1/videos/image2video"
-    model_name = "kling-v3"
-
-    def generate(
-        self,
-        image: str | os.PathLike[str],
-        prompt: str = "",
-        output_path: str | os.PathLike[str] | None = None,
-        duration: int | str = 5,
-        mode: str = "std",
-        poll_interval: float = 5,
-        timeout: float = 600,
-    ) -> VideoResult:
-        """Generate a video from an image and wait for the finished result."""
-
-        payload = {
-            "model_name": self.model_name,
-            "image": normalize_image(image),
-            "prompt": prompt or "",
-            "duration": str(duration),
-            "mode": mode,
-        }
-        return self.run_task(
-            payload,
-            output_path=output_path,
-            poll_interval=poll_interval,
-            timeout=timeout,
-        )
-
-
 class KlingV3TextToVideo(BaseKlingVideoTask):
     """Kling V3 text-to-video wrapper with a local-model-style API."""
 
@@ -183,7 +169,7 @@ class KlingV3TextToVideo(BaseKlingVideoTask):
         sound: str = "off",
         poll_interval: float = 5,
         timeout: float = 600,
-    ) -> VideoResult:
+    ) -> KlingVideoResult:
         """Generate a video from text and wait for the finished result."""
 
         payload = {
@@ -197,6 +183,39 @@ class KlingV3TextToVideo(BaseKlingVideoTask):
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
 
+        return self.run_task(
+            payload,
+            output_path=output_path,
+            poll_interval=poll_interval,
+            timeout=timeout,
+        )
+
+
+class KlingV3ImageToVideo(BaseKlingVideoTask):
+    """Kling V3 image-to-video wrapper with a local-model-style API."""
+
+    endpoint = "/v1/videos/image2video"
+    model_name = "kling-v3"
+
+    def generate(
+        self,
+        image: str | os.PathLike[str],
+        prompt: str = "",
+        output_path: str | os.PathLike[str] | None = None,
+        duration: int | str = 5,
+        mode: str = "std",
+        poll_interval: float = 5,
+        timeout: float = 600,
+    ) -> KlingVideoResult:
+        """Generate a video from an image and wait for the finished result."""
+
+        payload = {
+            "model_name": self.model_name,
+            "image": normalize_image(image),
+            "prompt": prompt or "",
+            "duration": str(duration),
+            "mode": mode,
+        }
         return self.run_task(
             payload,
             output_path=output_path,
@@ -219,7 +238,7 @@ class KlingVideoExtension(BaseKlingVideoTask):
         cfg_scale: float | None = None,
         poll_interval: float = 5,
         timeout: float = 600,
-    ) -> VideoResult:
+    ) -> KlingVideoResult:
         """Extend an existing Kling-generated video and wait for the finished result."""
 
         payload: dict[str, Any] = {

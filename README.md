@@ -16,7 +16,7 @@ export OPENAI_API_KEY="your-openai-api-key"
 #### Text-to-Image Usage
 
 ```python
-from gpt import GPTImage2TextToImage
+from apis import GPTImage2TextToImage
 
 model = GPTImage2TextToImage.from_env()
 result = model.generate(
@@ -40,7 +40,7 @@ print(result.b64_json)
 #### Image Editing Usage
 
 ```python
-from gpt import GPTImage2ImageEditing
+from apis import GPTImage2ImageEditing
 
 model = GPTImage2ImageEditing.from_env()
 result = model.generate(
@@ -59,7 +59,7 @@ print(result.b64_json)
 
 - `image`: Required. A local image path, file object, bytes, or a list of image inputs accepted by the OpenAI SDK.
 - `prompt`: Required. Text prompt describing the edit.
-- `output_path`: Optional. Local path for saving the edited image. The wrapper infers the OpenAI `output_format` from `.png`, `.jpg`, `.jpeg`, or `.webp`.
+- `output_path`: Optional. Local path for saving the edited image.
 - `mask`: Optional. A local mask path or file input accepted by the OpenAI SDK.
 - `size`: Optional. Image size. Defaults to `auto`.
 - `quality`: Optional. Image quality. Defaults to `auto`.
@@ -67,7 +67,7 @@ print(result.b64_json)
 
 #### Errors
 
-- `GPTImage2Error`: Raised for wrapper-level errors such as missing `OPENAI_API_KEY`, unsupported output file extensions, invalid response data, or image save failures.
+- `GPTError`: Raised for wrapper-level errors such as missing `OPENAI_API_KEY`, unsupported output file extensions, invalid response data, or image save failures.
 - OpenAI SDK API exceptions are raised directly by the `openai` package.
 
 
@@ -88,38 +88,10 @@ export KLING_ACCESS_KEY="your-access-key"
 export KLING_SECRET_KEY="your-secret-key"
 ```
 
-#### Image-to-Video Usage
-
-```python
-from kling import KlingV3ImageToVideo
-
-model = KlingV3ImageToVideo.from_env()
-result = model.generate(
-    image="input.png",
-    prompt="The camera slowly pushes in while the person smiles.",
-    output_path="outputs/kling-image2video.mp4",
-    duration=5,
-    mode="std",
-)
-
-print(result.url)
-print(result.path)
-```
-
-#### Image-to-Video Parameters
-
-- `image`: Required. A local image path, image URL, raw base64 string, or data URI.
-- `prompt`: Optional. Positive text prompt. Defaults to an empty string.
-- `output_path`: Optional. Local path for saving the generated video. If omitted, only the Kling video URL is returned.
-- `duration`: Optional. Video duration in seconds. Defaults to `5`.
-- `mode`: Optional. Generation mode. Defaults to `std`; use Kling-supported values such as `std` or `pro`.
-- `poll_interval`: Optional. Seconds between task status polls. Defaults to `5`.
-- `timeout`: Optional. Maximum seconds to wait for the task to finish. Defaults to `600`.
-
 #### Text-to-Video Usage
 
 ```python
-from kling import KlingV3TextToVideo
+from apis import KlingV3TextToVideo
 
 model = KlingV3TextToVideo.from_env()
 result = model.generate(
@@ -146,10 +118,38 @@ print(result.path)
 - `poll_interval`: Optional. Seconds between task status polls. Defaults to `5`.
 - `timeout`: Optional. Maximum seconds to wait for the task to finish. Defaults to `600`.
 
+#### Image-to-Video Usage
+
+```python
+from apis import KlingV3ImageToVideo
+
+model = KlingV3ImageToVideo.from_env()
+result = model.generate(
+    image="input.png",
+    prompt="The camera slowly pushes in while the person smiles.",
+    output_path="outputs/kling-image2video.mp4",
+    duration=5,
+    mode="std",
+)
+
+print(result.url)
+print(result.path)
+```
+
+#### Image-to-Video Parameters
+
+- `image`: Required. A local image path, image URL, raw base64 string, or data URI.
+- `prompt`: Optional. Positive text prompt. Defaults to an empty string.
+- `output_path`: Optional. Local path for saving the generated video. If omitted, only the Kling video URL is returned.
+- `duration`: Optional. Video duration in seconds. Defaults to `5`.
+- `mode`: Optional. Generation mode. Defaults to `std`; use Kling-supported values such as `std` or `pro`.
+- `poll_interval`: Optional. Seconds between task status polls. Defaults to `5`.
+- `timeout`: Optional. Maximum seconds to wait for the task to finish. Defaults to `600`.
+
 #### Video Extension Usage
 
 ```python
-from kling import KlingVideoExtension
+from apis import KlingVideoExtension
 
 model = KlingVideoExtension.from_env()
 result = model.generate(
@@ -175,9 +175,9 @@ print(result.path)
 #### Errors
 
 - `KlingError`: Base class for all errors raised by this wrapper. Use it to catch every Kling-related failure.
-- `KlingAPIError`: Raised when the Kling HTTP API returns an error, a network request fails, the response format is invalid, or a successful task response does not include a video URL. Includes `code`, `status`, `request_id`, and `response` fields.
-- `KlingTaskFailed`: Raised when the generation task reaches the `failed` state. Includes `task_id` and `response` fields.
-- `KlingTimeout`: Raised when polling exceeds `timeout`. Includes `task_id` and `timeout` fields.
+- `KlingAPIError`: Raised when the Kling HTTP API returns an error, a network request fails, the response format is invalid, or a successful task response does not include a video URL.
+- `KlingTaskFailedError`: Raised when the generation task reaches the `failed` state.
+- `KlingTimeoutError`: Raised when polling exceeds `timeout`.
 
 
 
