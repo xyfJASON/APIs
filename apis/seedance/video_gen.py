@@ -62,7 +62,7 @@ def normalize_video(video: str | os.PathLike[str]) -> str:
     raise SeedanceError("Video must be a public URL or asset:// ID")
 
 
-class BaseSeedanceVideoTask:
+class BaseSeedanceVideoGenerationTask:
     """Base class for Seedance video generation tasks."""
 
     model_name: str
@@ -74,10 +74,9 @@ class BaseSeedanceVideoTask:
         client: Any | None = None,
         base_url: str | None = None,
         request_timeout: float | None = None,
+        model_name: str | None = None,
     ) -> None:
-        if not getattr(self, "model_name", ""):
-            raise ValueError("Seedance video task model_name is required")
-
+        self.model_name = self.require_model_name(model_name)
         self.request_timeout = request_timeout or 60
         if client is not None:
             self.client = client
@@ -94,12 +93,12 @@ class BaseSeedanceVideoTask:
         self.client = Ark(**kwargs)
 
     @classmethod
-    def from_env(cls) -> Self:
+    def from_env(cls, *, model_name: str | None = None) -> Self:
         api_key = os.environ.get("ARK_API_KEY", "")
         base_url = os.environ.get("ARK_BASE_URL")
         if not api_key:
             raise SeedanceError("Missing required environment variable: ARK_API_KEY")
-        return cls(api_key=api_key, base_url=base_url)
+        return cls(api_key=api_key, base_url=base_url, model_name=model_name)
 
     def create_task(self, payload: dict[str, Any]) -> object:
         return self.client.content_generation.tasks.create(**payload)
@@ -232,11 +231,15 @@ class BaseSeedanceVideoTask:
         if not prompt:
             raise SeedanceError("Prompt is required")
 
+    @staticmethod
+    def require_model_name(model_name: str | None) -> str:
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise SeedanceError("model_name is required")
+        return model_name.strip()
 
-class Seedance20TextToVideo(BaseSeedanceVideoTask):
-    """Seedance 2.0 text-to-video wrapper with a local-model-style API."""
 
-    model_name = "doubao-seedance-2-0-260128"
+class SeedanceTextToVideo(BaseSeedanceVideoGenerationTask):
+    """Seedance text-to-video wrapper with a local-model-style API."""
 
     def generate(
         self,
@@ -279,10 +282,8 @@ class Seedance20TextToVideo(BaseSeedanceVideoTask):
         return self.run_task(payload, output_path=output_path, poll_interval=poll_interval, timeout=timeout)
 
 
-class Seedance20ImageToVideo(BaseSeedanceVideoTask):
-    """Seedance 2.0 image-to-video wrapper with a local-model-style API."""
-
-    model_name = "doubao-seedance-2-0-260128"
+class SeedanceImageToVideo(BaseSeedanceVideoGenerationTask):
+    """Seedance image-to-video wrapper with a local-model-style API."""
 
     def generate(
         self,
@@ -344,10 +345,8 @@ class Seedance20ImageToVideo(BaseSeedanceVideoTask):
         return self.run_task(payload, output_path=output_path, poll_interval=poll_interval, timeout=timeout)
 
 
-class Seedance20VideoExtension(BaseSeedanceVideoTask):
-    """Seedance 2.0 video extension wrapper with a local-model-style API."""
-
-    model_name = "doubao-seedance-2-0-260128"
+class SeedanceVideoExtension(BaseSeedanceVideoGenerationTask):
+    """Seedance video extension wrapper with a local-model-style API."""
 
     def generate(
         self,

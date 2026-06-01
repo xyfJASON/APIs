@@ -1,19 +1,7 @@
-from .errors import SeedanceError, SeedanceTaskFailedError, SeedanceTimeoutError
-from .video import (
-    BaseSeedanceVideoTask,
-    Seedance20ImageToVideo,
-    Seedance20TextToVideo,
-    Seedance20VideoExtension,
-    SeedanceVideoResult,
-)
+from .video_gen import SeedanceTextToVideo, SeedanceImageToVideo, SeedanceVideoExtension
 
 __all__ = [
-    "BaseSeedanceVideoTask",
-    "SeedanceError",
-    "SeedanceTaskFailedError",
-    "SeedanceTimeoutError",
-    "Seedance20ImageToVideo",
-    "Seedance20TextToVideo",
-    "Seedance20VideoExtension",
-    "SeedanceVideoResult",
+    "SeedanceImageToVideo",
+    "SeedanceTextToVideo",
+    "SeedanceVideoExtension",
 ]

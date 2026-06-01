@@ -1,4 +1,4 @@
-## Seedance 2.0 Video APIs
+## Seedance
 
 Official documentation: https://www.volcengine.com/docs/82379/1520757?lang=zh
 
@@ -11,12 +11,18 @@ Official documentation: https://www.volcengine.com/docs/82379/1520757?lang=zh
 export ARK_API_KEY="your-ark-api-key"
 ```
 
+### Model List
+
+- `doubao-seedance-2-0-260128`: Seedance 2.0
+- `doubao-seedance-1-5-pro-251215`: Seedance 1.5 Pro
+- `doubao-seedance-1-0-pro-250528`: Seedance 1.0 Pro
+
 ### Text-to-Video
 
 ```python
-from apis import Seedance20TextToVideo
+from apis import SeedanceTextToVideo
 
-model = Seedance20TextToVideo.from_env()
+model = SeedanceTextToVideo.from_env(model_name="doubao-seedance-2-0-260128")
 result = model.generate(
     prompt="A cinematic shot of morning light moving across a quiet greenhouse.",
     output_path="outputs/seedance-text2video.mp4",
@@ -43,9 +49,9 @@ print(result.path)
 ### Image-to-Video
 
 ```python
-from apis import Seedance20ImageToVideo
+from apis import SeedanceImageToVideo
 
-model = Seedance20ImageToVideo.from_env()
+model = SeedanceImageToVideo.from_env(model_name="doubao-seedance-2-0-260128")
 result = model.generate(
     image="input.png",
     prompt="The camera gently pushes in as leaves move in the breeze.",
@@ -67,9 +73,9 @@ print(result.path)
 ### Video Extension
 
 ```python
-from apis import Seedance20VideoExtension
+from apis import SeedanceVideoExtension
 
-model = Seedance20VideoExtension.from_env()
+model = SeedanceVideoExtension.from_env(model_name="doubao-seedance-2-0-260128")
 result = model.generate(
     video="https://example.com/input.mp4",
     prompt="Extend the shot forward as the camera enters the hallway.",

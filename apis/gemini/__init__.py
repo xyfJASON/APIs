@@ -1,21 +1,10 @@
 from .errors import GeminiError
-from .image import (
-    GeminiImageResult,
-    NanoBanana2ImageEditing,
-    NanoBanana2TextToImage,
-    NanoBananaImageEditing,
-    NanoBananaProImageEditing,
-    NanoBananaProTextToImage,
-    NanoBananaTextToImage,
-)
+from .image_gen import NanoBananaTextToImage, NanoBananaImageEditing
+from .video_und import GeminiVideoUnderstanding
 
 __all__ = [
     "GeminiError",
-    "GeminiImageResult",
     "NanoBananaTextToImage",
     "NanoBananaImageEditing",
-    "NanoBanana2TextToImage",
-    "NanoBanana2ImageEditing",
-    "NanoBananaProTextToImage",
-    "NanoBananaProImageEditing",
+    "GeminiVideoUnderstanding",
 ]

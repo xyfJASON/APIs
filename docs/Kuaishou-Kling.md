@@ -1,4 +1,4 @@
-## Kling V3 Video APIs
+## Kling Video
 
 Official documentation: https://klingai.com/document-api
 
@@ -13,12 +13,23 @@ export KLING_ACCESS_KEY="your-access-key"
 export KLING_SECRET_KEY="your-secret-key"
 ```
 
+### Model List
+
+- `kling-v3`
+- `kling-v2-6`
+- `kling-v2-5-turbo`
+- `kling-v2-1-master`
+- `kling-v2-master`
+- `kling-v1-6`
+- `kling-v1-5`
+- `kling-v1`
+
 ### Text-to-Video
 
 ```python
-from apis import KlingV3TextToVideo
+from apis import KlingTextToVideo
 
-model = KlingV3TextToVideo.from_env()
+model = KlingTextToVideo.from_env(model_name="kling-v3")
 result = model.generate(
     prompt="A small rabbit wearing glasses reads a newspaper at a cafe table.",
     output_path="outputs/kling-text2video.mp4",
@@ -44,9 +55,9 @@ print(result.path)
 ### Image-to-Video
 
 ```python
-from apis import KlingV3ImageToVideo
+from apis import KlingImageToVideo
 
-model = KlingV3ImageToVideo.from_env()
+model = KlingImageToVideo.from_env(model_name="kling-v3")
 result = model.generate(
     image="input.png",
     prompt="The camera slowly pushes in while the person smiles.",
@@ -72,7 +83,7 @@ print(result.path)
 ```python
 from apis import KlingVideoExtension
 
-model = KlingVideoExtension.from_env()
+model = KlingVideoExtension.from_env(model_name="kling-v3")
 result = model.generate(
     video_id="743211632612511839",
     prompt="A puppy appears and runs into the scene.",

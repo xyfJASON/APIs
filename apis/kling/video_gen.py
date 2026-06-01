@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from .client import KlingClient
-from .errors import KlingAPIError, KlingTaskFailedError, KlingTimeoutError
+from .errors import KlingAPIError, KlingError, KlingTaskFailedError, KlingTimeoutError
 
 
 @dataclasses.dataclass
@@ -44,10 +44,11 @@ def normalize_image(image: str | os.PathLike[str]) -> str:
     return stripped
 
 
-class BaseKlingVideoTask:
+class BaseKlingVideoGenerationTask:
     """Base class for Kling video generation tasks."""
 
     endpoint: str
+    model_name: str
 
     def __init__(
         self,
@@ -57,10 +58,12 @@ class BaseKlingVideoTask:
         client: KlingClient | None = None,
         base_url: str | None = None,
         request_timeout: float = 60,
+        model_name: str | None = None,
     ) -> None:
         if not getattr(self, "endpoint", ""):
             raise ValueError("Kling video task endpoint is required")
 
+        self.model_name = self.require_model_name(model_name)
         if client is not None:
             self.client = client
             return
@@ -71,8 +74,8 @@ class BaseKlingVideoTask:
         self.client = KlingClient(access_key or "", secret_key or "", **kwargs)
 
     @classmethod
-    def from_env(cls) -> Self:
-        return cls(client=KlingClient.from_env())
+    def from_env(cls, *, model_name: str | None = None) -> Self:
+        return cls(client=KlingClient.from_env(), model_name=model_name)
 
     def create_task(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self.client.post(self.endpoint, payload)
@@ -151,12 +154,17 @@ class BaseKlingVideoTask:
 
         return videos[0]
 
+    @staticmethod
+    def require_model_name(model_name: str | None) -> str:
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise KlingError("model_name is required")
+        return model_name.strip()
 
-class KlingV3TextToVideo(BaseKlingVideoTask):
-    """Kling V3 text-to-video wrapper with a local-model-style API."""
+
+class KlingTextToVideo(BaseKlingVideoGenerationTask):
+    """Kling text-to-video wrapper with a local-model-style API."""
 
     endpoint = "/v1/videos/text2video"
-    model_name = "kling-v3"
 
     def generate(
         self,
@@ -191,11 +199,10 @@ class KlingV3TextToVideo(BaseKlingVideoTask):
         )
 
 
-class KlingV3ImageToVideo(BaseKlingVideoTask):
-    """Kling V3 image-to-video wrapper with a local-model-style API."""
+class KlingImageToVideo(BaseKlingVideoGenerationTask):
+    """Kling image-to-video wrapper with a local-model-style API."""
 
     endpoint = "/v1/videos/image2video"
-    model_name = "kling-v3"
 
     def generate(
         self,
@@ -224,7 +231,7 @@ class KlingV3ImageToVideo(BaseKlingVideoTask):
         )
 
 
-class KlingVideoExtension(BaseKlingVideoTask):
+class KlingVideoExtension(BaseKlingVideoGenerationTask):
     """Kling video extension wrapper with a local-model-style API."""
 
     endpoint = "/v1/videos/video-extend"
@@ -242,6 +249,7 @@ class KlingVideoExtension(BaseKlingVideoTask):
         """Extend an existing Kling-generated video and wait for the finished result."""
 
         payload: dict[str, Any] = {
+            "model_name": self.model_name,
             "video_id": video_id,
             "prompt": prompt,
         }

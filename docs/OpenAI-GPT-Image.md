@@ -1,4 +1,4 @@
-## GPT-Image-2 APIs
+## GPT Image
 
 Official documentation: https://developers.openai.com/api/docs/guides/image-generation
 
@@ -11,12 +11,16 @@ Official documentation: https://developers.openai.com/api/docs/guides/image-gene
 export OPENAI_API_KEY="your-openai-api-key"
 ```
 
+### Model List
+
+- `gpt-image-2`
+
 ### Text-to-Image
 
 ```python
-from apis import GPTImage2TextToImage
+from apis import GPTImageTextToImage
 
-model = GPTImage2TextToImage.from_env()
+model = GPTImageTextToImage.from_env(model_name="gpt-image-2")
 result = model.generate(
     prompt="A cinematic product photo of a glass teapot on a marble counter.",
     output_path="outputs/gpt-image-2-text2image.jpg",
@@ -36,9 +40,9 @@ print(result.b64_json)
 ### Image Editing
 
 ```python
-from apis import GPTImage2ImageEditing
+from apis import GPTImageEditing
 
-model = GPTImage2ImageEditing.from_env()
+model = GPTImageEditing.from_env(model_name="gpt-image-2")
 result = model.generate(
     image="input.png",
     prompt="Replace the teapot with a ceramic mug.",

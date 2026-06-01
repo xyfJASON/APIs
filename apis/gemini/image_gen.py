@@ -1,4 +1,4 @@
-"""Image task wrappers for Gemini Image APIs."""
+"""Image task wrappers for Nano Banana APIs."""
 
 from __future__ import annotations
 
@@ -18,19 +18,14 @@ from .errors import GeminiError
 
 
 __all__ = [
-    "GeminiImageResult",
     "NanoBananaTextToImage",
     "NanoBananaImageEditing",
-    "NanoBananaProTextToImage",
-    "NanoBananaProImageEditing",
-    "NanoBanana2TextToImage",
-    "NanoBanana2ImageEditing",
 ]
 
 
 @dataclasses.dataclass
-class GeminiImageResult:
-    """Generated image result returned by Gemini image wrappers."""
+class NanoBananaImageGenerationResult:
+    """Generated image result returned by Nano Banana image wrappers."""
 
     b64_json: str
     path: str | None
@@ -39,10 +34,10 @@ class GeminiImageResult:
     raw: object
 
 
-class BaseGeminiImageTask:
-    """Base class for Gemini image generation tasks."""
+class BaseNanoBananaImageGenerationTask:
+    """Base class for Nano Banana image generation tasks."""
 
-    model_name = "gemini-3.1-flash-image"
+    model_name: str
 
     def __init__(
         self,
@@ -51,7 +46,7 @@ class BaseGeminiImageTask:
         client: Any | None = None,
         model_name: str | None = None,
     ) -> None:
-        self.model_name = model_name or self.model_name
+        self.model_name = self.require_model_name(model_name)
         if client is not None:
             self.client = client
             return
@@ -62,11 +57,11 @@ class BaseGeminiImageTask:
         self.client = genai.Client(api_key=api_key)
 
     @classmethod
-    def from_env(cls) -> Self:
+    def from_env(cls, *, model_name: str | None = None) -> Self:
         api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
             raise GeminiError("Missing required environment variable: GEMINI_API_KEY")
-        return cls(api_key=api_key)
+        return cls(api_key=api_key, model_name=model_name)
 
     @staticmethod
     def content_config(
@@ -96,7 +91,7 @@ class BaseGeminiImageTask:
         self,
         response: object,
         output_path: str | os.PathLike[str] | None = None,
-    ) -> GeminiImageResult:
+    ) -> NanoBananaImageGenerationResult:
         text_parts: list[str] = []
         first_image: tuple[bytes, str, str | None, object] | None = None
 
@@ -117,7 +112,7 @@ class BaseGeminiImageTask:
             if output_path is not None:
                 saved_path = self.save_image(image_bytes, output_path, part=part)
 
-            return GeminiImageResult(
+            return NanoBananaImageGenerationResult(
                 b64_json=b64_json,
                 path=saved_path,
                 mime_type=mime_type,
@@ -240,7 +235,7 @@ class BaseGeminiImageTask:
                 raise GeminiError(f"Failed to open image: {path}") from exc
 
         if isinstance(image, list | tuple):
-            return [BaseGeminiImageTask.normalize_image_input(item) for item in image]
+            return [BaseNanoBananaImageGenerationTask.normalize_image_input(item) for item in image]
 
         return image
 
@@ -255,9 +250,15 @@ class BaseGeminiImageTask:
         if not prompt:
             raise GeminiError("Prompt is required")
 
+    @staticmethod
+    def require_model_name(model_name: str | None) -> str:
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise GeminiError("model_name is required")
+        return model_name.strip()
 
-class GeminiImageTextToImage(BaseGeminiImageTask):
-    """Gemini text-to-image wrapper with a local-model-style API."""
+
+class NanoBananaTextToImage(BaseNanoBananaImageGenerationTask):
+    """Nano Banana text-to-image wrapper with a local-model-style API."""
 
     def generate(
         self,
@@ -267,7 +268,7 @@ class GeminiImageTextToImage(BaseGeminiImageTask):
         response_modalities: Iterable[str] = ("IMAGE",),
         aspect_ratio: str | None = None,
         image_size: str | None = None,
-    ) -> GeminiImageResult:
+    ) -> NanoBananaImageGenerationResult:
         """Generate one image from a text prompt."""
 
         self.require_prompt(prompt)
@@ -283,8 +284,8 @@ class GeminiImageTextToImage(BaseGeminiImageTask):
         return self.image_result(response, output_path=output_path)
 
 
-class GeminiImageEditing(BaseGeminiImageTask):
-    """Gemini image editing wrapper with a local-model-style API."""
+class NanoBananaImageEditing(BaseNanoBananaImageGenerationTask):
+    """Nano Banana image editing wrapper with a local-model-style API."""
 
     def generate(
         self,
@@ -295,7 +296,7 @@ class GeminiImageEditing(BaseGeminiImageTask):
         response_modalities: Iterable[str] = ("IMAGE",),
         aspect_ratio: str | None = None,
         image_size: str | None = None,
-    ) -> GeminiImageResult:
+    ) -> NanoBananaImageGenerationResult:
         """Generate an edited image from an input image and text prompt."""
 
         self.require_prompt(prompt)
@@ -313,39 +314,3 @@ class GeminiImageEditing(BaseGeminiImageTask):
             ),
         )
         return self.image_result(response, output_path=output_path)
-
-
-class NanoBananaTextToImage(GeminiImageTextToImage):
-    """Nano Banana text-to-image wrapper for gemini-2.5-flash-image."""
-
-    model_name = "gemini-2.5-flash-image"
-
-
-class NanoBananaImageEditing(GeminiImageEditing):
-    """Nano Banana image editing wrapper for gemini-2.5-flash-image."""
-
-    model_name = "gemini-2.5-flash-image"
-
-
-class NanoBananaProTextToImage(GeminiImageTextToImage):
-    """Nano Banana Pro text-to-image wrapper for gemini-3-pro-image."""
-
-    model_name = "gemini-3-pro-image"
-
-
-class NanoBananaProImageEditing(GeminiImageEditing):
-    """Nano Banana Pro image editing wrapper for gemini-3-pro-image."""
-
-    model_name = "gemini-3-pro-image"
-
-
-class NanoBanana2TextToImage(GeminiImageTextToImage):
-    """Nano Banana 2 text-to-image wrapper for gemini-3.1-flash-image."""
-
-    model_name = "gemini-3.1-flash-image"
-
-
-class NanoBanana2ImageEditing(GeminiImageEditing):
-    """Nano Banana 2 image editing wrapper for gemini-3.1-flash-image."""
-
-    model_name = "gemini-3.1-flash-image"

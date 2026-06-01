@@ -26,8 +26,10 @@ class GPTImageResult:
     raw: object
 
 
-class BaseGPTImageTask:
+class BaseGPTImageGenerationTask:
     """Base class for GPT image generation tasks."""
+
+    model_name: str
 
     def __init__(
         self,
@@ -36,7 +38,9 @@ class BaseGPTImageTask:
         client: Any | None = None,
         base_url: str | None = None,
         request_timeout: float | None = None,
+        model_name: str | None = None,
     ) -> None:
+        self.model_name = self.require_model_name(model_name)
         if client is not None:
             self.client = client
             return
@@ -46,18 +50,18 @@ class BaseGPTImageTask:
 
         kwargs: dict[str, Any] = {"api_key": api_key}
         if base_url is not None:
-            kwargs["base_url"] = base_url
+            kwargs["base_url"] = self.normalize_base_url(base_url)
         if request_timeout is not None:
             kwargs["timeout"] = request_timeout
         self.client = OpenAI(**kwargs)
 
     @classmethod
-    def from_env(cls) -> Self:
+    def from_env(cls, *, model_name: str | None = None) -> Self:
         api_key = os.environ.get("OPENAI_API_KEY", "")
         base_url = os.environ.get("OPENAI_BASE_URL")
         if not api_key:
             raise GPTError("Missing required environment variable: OPENAI_API_KEY")
-        return cls(api_key=api_key, base_url=base_url)
+        return cls(api_key=api_key, base_url=base_url, model_name=model_name)
 
     def image_result(self, response: object, output_path: str | os.PathLike[str] | None = None) -> GPTImageResult:
         image = self.first_image(response)
@@ -130,6 +134,19 @@ class BaseGPTImageTask:
             raise GPTError("Prompt is required")
 
     @staticmethod
+    def require_model_name(model_name: str | None) -> str:
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise GPTError("model_name is required")
+        return model_name.strip()
+
+    @staticmethod
+    def normalize_base_url(base_url: str) -> str:
+        normalized = base_url.rstrip("/")
+        if not normalized.endswith("/v1"):
+            normalized = f"{normalized}/v1"
+        return normalized
+
+    @staticmethod
     def open_file_input(value: object, stack: contextlib.ExitStack) -> object:
         if isinstance(value, (str, os.PathLike)):
             path = Path(value).expanduser()
@@ -146,10 +163,8 @@ class BaseGPTImageTask:
         return image
 
 
-class GPTImage2TextToImage(BaseGPTImageTask):
-    """GPT-Image-2 text-to-image wrapper with a local-model-style API."""
-
-    model_name = "gpt-image-2"
+class GPTImageTextToImage(BaseGPTImageGenerationTask):
+    """GPT image text-to-image wrapper with a local-model-style API."""
 
     def generate(
         self,
@@ -172,10 +187,8 @@ class GPTImage2TextToImage(BaseGPTImageTask):
         return self.image_result(response, output_path=output_path)
 
 
-class GPTImage2ImageEditing(BaseGPTImageTask):
-    """GPT-Image-2 image editing wrapper with a local-model-style API."""
-
-    model_name = "gpt-image-2"
+class GPTImageEditing(BaseGPTImageGenerationTask):
+    """GPT image editing wrapper with a local-model-style API."""
 
     def generate(
         self,

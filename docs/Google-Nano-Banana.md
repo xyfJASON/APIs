@@ -1,4 +1,4 @@
-## Nano Banana APIs
+## Nano Banana (Gemini Image)
 
 Official documentation: https://ai.google.dev/gemini-api/docs/image-generation
 
@@ -10,12 +10,18 @@ Official documentation: https://ai.google.dev/gemini-api/docs/image-generation
 export GEMINI_API_KEY="your-gemini-api-key"
 ```
 
+### Model List
+
+- `gemini-3.1-flash-image`: Nano Banana 2
+- `gemini-3-pro-image`: Nano Banana Pro
+- `gemini-2.5-flash-image`: Nano Banana
+
 ### Text-to-Image
 
 ```python
-from apis import NanoBanana2TextToImage
+from apis import NanoBananaTextToImage
 
-model = NanoBanana2TextToImage.from_env()
+model = NanoBananaTextToImage.from_env(model_name="gemini-3.1-flash-image")
 result = model.generate(
     prompt="A serene landscape with mountains and a river at sunset.",
     output_path="outputs/gemini-text2image.png",
@@ -35,9 +41,9 @@ print(result.b64_json)
 ### Image Editing
 
 ```python
-from apis import NanoBanana2ImageEditing
+from apis import NanoBananaImageEditing
 
-model = NanoBanana2ImageEditing.from_env()
+model = NanoBananaImageEditing.from_env(model_name="gemini-3.1-flash-image")
 result = model.generate(
     image="input.png",
     prompt="Change the background to a Martian landscape with red rocks and a dusty sky.",
@@ -54,25 +60,6 @@ print(result.b64_json)
 - `response_modalities`: Optional. Gemini response modalities. Defaults to `("IMAGE",)`.
 - `aspect_ratio`: Optional. Gemini image aspect ratio, such as `1:1`, `16:9`, or `9:16`.
 - `image_size`: Optional. Gemini image size when supported by the selected model.
-
-### Model Aliases
-
-- `NanoBanana`: `gemini-2.5-flash-image`
-- `NanoBananaPro`: `gemini-3-pro-image`
-- `NanoBanana2`: `gemini-3.1-flash-image`
-
-Each alias has `TextToImage` and `ImageEditing` classes.
-
-```python
-# Nano Banana 2 (gemini-3.1-flash-image)
-from apis import NanoBanana2TextToImage, NanoBanana2ImageEditing
-
-# Nano Banana Pro (gemini-3-pro-image)
-from apis import NanoBananaProTextToImage, NanoBananaProImageEditing
-
-# Nano Banana (gemini-2.5-flash-image)
-from apis import NanoBananaTextToImage, NanoBananaImageEditing
-```
 
 ### Errors
 

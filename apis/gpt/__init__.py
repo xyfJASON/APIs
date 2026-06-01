@@ -1,10 +1,6 @@
-from .errors import GPTError
-from .image import BaseGPTImageTask, GPTImage2ImageEditing, GPTImage2TextToImage, GPTImageResult
+from .image_gen import GPTImageTextToImage, GPTImageEditing
 
 __all__ = [
-    "BaseGPTImageTask",
-    "GPTError",
-    "GPTImage2ImageEditing",
-    "GPTImage2TextToImage",
-    "GPTImageResult",
+    "GPTImageTextToImage",
+    "GPTImageEditing",
 ]
