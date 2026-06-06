@@ -2,6 +2,7 @@ from .gemini import NanoBananaImageEditing, NanoBananaTextToImage, GeminiVideoUn
 from .gpt import GPTImageEditing, GPTImageTextToImage
 from .kling import KlingImageToVideo, KlingTextToVideo, KlingVideoExtension
 from .seedance import SeedanceImageToVideo, SeedanceTextToVideo, SeedanceVideoExtension
+from .veo import VeoImageToVideo, VeoTextToVideo, VeoVideoExtension
 
 __all__ = [
     "NanoBananaImageEditing",
@@ -15,4 +16,7 @@ __all__ = [
     "SeedanceImageToVideo",
     "SeedanceTextToVideo",
     "SeedanceVideoExtension",
+    "VeoImageToVideo",
+    "VeoTextToVideo",
+    "VeoVideoExtension",
 ]
